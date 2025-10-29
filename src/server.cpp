@@ -3,17 +3,73 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
+#include <process.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define DEFAULT_BUFLEN 512;
+#define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27015"
 
-int main(void)
-{
+
+//TODO --> Create thread struct?
+struct clientThread {
+    SOCKET ClientSock;
+    int clientId;
+};
+//TODO --> Create client thread handler function
+unsigned __stdcall handler(void *data) {
+    clientThread *clientData = (clientThread *)data;
+    SOCKET ClientSock = clientData->ClientSock;
+    int clientId = clientData->clientId;
+
+    //debugging
+    //printf("Handler started for client %d --> tid %lu\n", clientId, GetCurrentThreadId());
+
+    const int recvbuflen = 512;
+    char recvbuf[recvbuflen];
+    int iResult, iSendResult;
+
+    printf("Client %d connected to handler\n", clientId);
+
+    // receive until player shuts down connection
+    do {
+
+        iResult = recv(ClientSock, recvbuf, recvbuflen, 0);
+        if (iResult > 0) {
+            printf("[Client %d] Bytes received: %d\n", clientId, iResult);
+
+            // echo buffer back to sender
+            iSendResult = send(ClientSock, recvbuf, iResult, 0);
+            if (iSendResult == SOCKET_ERROR) {
+                printf("[Client %d] Send failed w/ error: %d\n", WSAGetLastError());
+                return 1;
+            }
+            printf("[Client %d] Bytes sent: %d\n", clientId, iSendResult);
+        }
+        else if (iResult == 0) {
+            printf("[Client %d] Connection closed by client.\n", clientId);
+        }
+        else {
+            printf("[Client %d] Recv failed w/ error: %d\n", clientId, WSAGetLastError());
+            break;
+        }
+
+    } while (iResult > 0);
+
+    closesocket(ClientSock);
+    delete clientData;
+    return 0;
+}
+
+int main(void) {
+
+//------WINSOCK INITIALIZATION---------------------------
+//--------------------------------------------------------
+    
     // initialize WSA variables
     WSADATA wsaData;
     int iResult;
@@ -72,7 +128,9 @@ int main(void)
         WSACleanup();
         return 1;
     }
+    freeaddrinfo(result);
 
+    // set up the listening itself
     iResult = listen(ListenSock, SOMAXCONN);
     if (iResult == SOCKET_ERROR)
     {
@@ -85,46 +143,41 @@ int main(void)
         printf("Listening on port 27015...\n");
     }
 
-    // accept a client socket
-    ClientSock = accept(ListenSock, NULL, NULL);
-        if (ClientSock == INVALID_SOCKET) {
-            printf("Accept failed w/ error: %d\n", WSAGetLastError());
-            closesocket(ListenSock);
-            WSACleanup();
-            return 1;
-    }
 
+
+//  ----------LISTENING & ACCEPTING-------------------
+//  --------------------------------------------------
+
+    int nextId = 1; //client labeling
+    while (true) {
+        sockaddr inaddr {};
+        int socklen = sizeof(inaddr);
+
+        SOCKET ClientSock = accept(ListenSock, &inaddr, &socklen);
+        if (ClientSock == INVALID_SOCKET) {
+            printf("Accept failed w/error: %d\n", WSAGetLastError());
+            continue; //keep listening for next client
+        } else {printf("Client connected at socket: %d\n", (int)ClientSock);}
+      
+        //thread data for newly connected client
+        clientThread *cData = new clientThread;
+        cData->ClientSock = ClientSock;
+        cData->clientId = nextId++;
+
+        //start thread
+        uintptr_t threadHandle = _beginthreadex(NULL, 0, handler, (void *)cData, 0, NULL);
+        if (threadHandle == 0) {
+            printf("Failed to spawn thread, error %d\n", errno);
+            closesocket(ClientSock);
+            delete cData;
+        } else {
+            //printf("Spawned handler thread for client %d\n", cData->clientId);
+            CloseHandle((HANDLE)threadHandle);
+        }
+
+    }
     // close the server socket
     closesocket(ListenSock);
-
-    // receive until player shuts down connection
-    do {
-
-        iResult = recv(ClientSock, recvbuf, recvbuflen, 0);
-        if (iResult > 0) {
-            printf("Bytes received: %d\n", iResult);
-
-            // echo buffer back to sender
-            iSendResult = send(ClientSock, recvbuf, iResult, 0);
-            if (iSendResult == SOCKET_ERROR) {
-                printf("Send failed w/ error: %d\n", WSAGetLastError());
-                closesocket(ClientSock);
-                WSACleanup();
-                return 1;
-            }
-            printf("Bytes sent: %d\n", iSendResult);
-        }
-        else if (iResult == 0) {
-            printf("Connection closed\n");
-        }
-        else {
-            printf("Recv failed w/ error: %d\n", WSAGetLastError());
-            closesocket(ClientSock);
-            WSACleanup();
-            return 1;
-        }
-
-    } while (iResult > 0);
 
     // shutdown connection when done
     iResult = shutdown(ClientSock, SD_SEND);
@@ -137,7 +190,6 @@ int main(void)
     }
 
     // cleanup
-    closesocket(ClientSock);
     WSACleanup();
 
     return 0;
