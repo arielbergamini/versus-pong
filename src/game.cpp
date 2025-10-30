@@ -1,4 +1,4 @@
-#include "game.h"
+#include "entities.h"
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
@@ -9,61 +9,38 @@ bool loop () {
     SDL_Rect rect;
     static int mx0, my0, mx1, my1 = -1;
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
     SDL_RenderFillRect(renderer, &rect);
 
     bool keep_window_open = true;
 
-    while ((keep_window_open) && (SDL_PollEvent(&event) !=0 ))
-    {
-            switch(event.type) 
-            {
-                case SDL_QUIT: //close window if user wants to quit
-                    keep_window_open = false;
-                    break;
-                case SDL_MOUSEBUTTONDOWN:
-                    mx0 = event.button.x;
-                    my0 = event.button.y;
-                    break;
-                case SDL_MOUSEMOTION:
-                    mx1 = event.button.x;
-                    my1 = event.button.y;
-                    break;
-                case SDL_MOUSEBUTTONUP:
-                    mx0 = my0 = mx1 = my1 = -1;
-                    break;
+
+    while (keep_window_open) {
+        //event handling logic
+        while (SDL_PollEvent(&event)) { 
+                switch(event.type) 
+                {
+                    case SDL_QUIT: //close window if user wants to quit
+                        keep_window_open = false;
+                        break;
+                }
             }
-        }
+        SDL_SetRenderDrawColor(renderer, 233, 4, 122, 0.8);
+        //create ball
+        Ball ball(
+            Vec2d((680.0 / 2.0f) - (BALL_WIDTH / 2.0f),
+            (480.0 / 2.0f) - (BALL_WIDTH / 2.0f)));
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        // Test key states - this could also be done with events
-        if ( keys[SDL_SCANCODE_1] ) {
-            SDL_RenderDrawPoint(renderer, 10, 10 );
-        }
-        if ( keys[SDL_SCANCODE_2] ) {
-            SDL_RenderDrawLine(renderer, 10, 20, 10, 100 );
-        }
-        if ( keys[SDL_SCANCODE_3] ) {
-            rect.x = 20;
-            rect.y = 20;
-            rect.w = 100;
-            rect.h = 100;
-            SDL_RenderFillRect(renderer, &rect);
-        }
-
-        // render mouse ptr
-        if ( mx0 != -1 ) {
-            rect.x = mx0;
-            rect.y = my0;
-            rect.w = mx1 - mx0;
-            rect.h = my1 - my0;
-		    SDL_RenderFillRect(renderer, &rect);
-	    }
-
+        //draw balL
+        ball.Draw(renderer);
         SDL_RenderPresent(renderer);
+    }
 
-        return keep_window_open;
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+    return false;
 }
 
 
@@ -91,7 +68,6 @@ bool init () {
         return false;
     }
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderClear(renderer);
     return true;
 }
