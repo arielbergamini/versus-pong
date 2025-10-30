@@ -25,15 +25,24 @@ bool loop () {
                         keep_window_open = false;
                         break;
                 }
-            }
+        }
+
+        //----------Create game objects & draw to window-------------------
         SDL_SetRenderDrawColor(renderer, 233, 4, 122, 0.8);
-        //create ball
+
         Ball ball(
             Vec2d((680.0 / 2.0f) - (BALL_WIDTH / 2.0f),
             (480.0 / 2.0f) - (BALL_WIDTH / 2.0f)));
 
-        //draw balL
+        Paddle paddle1(
+            Vec2d(50.0f, (480.0 / 2.0f) - (PADDLE_HEIGHT / 2.0f)));
+        Paddle paddle2(
+            Vec2d(680.0 - 50.0f, (480.0 / 2.0f) - (PADDLE_HEIGHT / 2.0f)));    
+
+        //draw objects to window
         ball.Draw(renderer);
+        paddle1.Draw(renderer);
+        paddle2.Draw(renderer);
         SDL_RenderPresent(renderer);
     }
 

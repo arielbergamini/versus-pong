@@ -3,6 +3,9 @@
 const int BALL_WIDTH = 15;
 const int BALL_HEIGHT = 15;
 
+const int PADDLE_WIDTH = 10;
+const int PADDLE_HEIGHT = 80;
+
 class Vec2d {
 
     public:
@@ -26,6 +29,8 @@ class Vec2d {
         }
 };
 
+
+//TODO --> ball physics!
 class Ball {
     public:
         Ball(Vec2d position) : position(position) {
@@ -46,8 +51,22 @@ class Ball {
         SDL_Rect rect{};
 };
 
+
+//TODO --> input sync & paddle physics!
 class Paddle {
     public:
-    private:
+        Paddle(Vec2d position) : position(position) {
+            rect.x = static_cast<int>(position.x);
+            rect.y = static_cast<int>(position.y);
+            rect.w = PADDLE_WIDTH;
+            rect.h = PADDLE_HEIGHT;
+        }
 
+        Vec2d position;
+        SDL_Rect rect{};
+
+        void Draw(SDL_Renderer* renderer) {
+            rect.y = static_cast<int>(position.y);
+            SDL_RenderFillRect(renderer, &rect);
+        }
 };
