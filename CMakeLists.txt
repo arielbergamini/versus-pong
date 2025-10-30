@@ -10,8 +10,14 @@ set(CMAKE_PREFIX_PATH "C:/Users/Ariel Bergamini/vcpkg/installed/x64-mingw-dynami
 
 find_package(SDL2 CONFIG REQUIRED)
 
-add_executable(pong src/pong.cpp)
+#build target
+add_executable(pong
+    src/main.cpp
+    src/game.cpp
+)
 
+#include & link sdl2
+target_include_directories(pong PRIVATE ${SDL2_INCLUDE_DIRS})
 target_link_libraries(pong PRIVATE SDL2::SDL2main SDL2::SDL2)
 
 #copy assets & required dlls after each build
@@ -31,5 +37,5 @@ add_custom_target(run
     COMMAND pong
     DEPENDS pong
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Running pong.exe from project root..."
+    COMMENT "Running .exe from project root..."
 )

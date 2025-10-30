@@ -1,30 +1,7 @@
+#include "game.h"
 
-//SDL Window that renders paddles & ball, closes on quit.
-//TODO --> Draw 2 paddles & 1 ball, add fixed timestamp. rendering loop
-
-
-#include <SDL2/SDL.h>
-#include <iostream>
-
-bool init();
-void kill();
-bool loop();
-
-SDL_Window *window;
-SDL_Renderer *renderer;
-
-int main (int argc, char* argv[]) {
-    
-    if (!init()) return 1;
-
-    //wait before processing next frame
-    while (loop()) {
-        SDL_Delay(10);
-    }
-    kill();
-    return 0;
-}
-
+SDL_Window* window = nullptr;
+SDL_Renderer* renderer = nullptr;
 
 bool loop () {
     static const unsigned char* keys = SDL_GetKeyboardState(NULL);
