@@ -1,3 +1,8 @@
+//TODO --> Connect to server ip/port, send hello, & wait for svr welcome
+//call sdl get keyboard state --> map keys --> send udp packet throttled
+//render gamestate frame by frame --> listen for nonblocking gamestate packets, render using those coords
+//interpolation?
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <ws2def.h>

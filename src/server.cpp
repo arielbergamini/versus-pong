@@ -1,4 +1,10 @@
 /*Initializes a TCP server that listens for two clients*/
+//TODO --> store client sockaddr_in6 & start game loop once connected
+//update ball position/bounce/move paddles based on input/detect paddle collisions
+//detect scoring (recenter ball, score++), broadcast gamestate to both clients
+
+
+
 #include <iostream>
 #include <winsock2.h>
 #include <windows.h>
@@ -15,12 +21,11 @@
 #define DEFAULT_PORT "27015"
 
 
-//TODO --> Create thread struct?
 struct clientThread {
     SOCKET ClientSock;
     int clientId;
 };
-//TODO --> Create client thread handler function
+
 unsigned __stdcall handler(void *data) {
     clientThread *clientData = (clientThread *)data;
     SOCKET ClientSock = clientData->ClientSock;
@@ -65,7 +70,7 @@ unsigned __stdcall handler(void *data) {
     return 0;
 }
 
-int main(void) {
+int main() {
 
 //------WINSOCK INITIALIZATION---------------------------
 //--------------------------------------------------------
