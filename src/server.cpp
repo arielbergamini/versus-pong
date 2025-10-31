@@ -4,8 +4,8 @@
 //detect scoring (recenter ball, score++), broadcast gamestate to both clients
 
 
-
 #include <iostream>
+#include <mutex>
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
@@ -13,13 +13,32 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <thread>
 #include <vector>
+#include "entities_server.h"
+#include "gamestate_server.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27015"
 
+Ball ball(
+        Vec2d(680.0 / 2.0f,  480.0 / 2.0f),
+        Vec2d(BALL_SPEED, 0.0f));
+
+Paddle paddle1(
+    Vec2d(50.0f, 480.0 / 2.0f),
+    Vec2d(0.0f, 0.0f));
+
+Paddle paddle2(
+    Vec2d(680.0 - 50.0f, 480.0 / 2.0f),
+    Vec2d(0.0f, 0.0f));   
+
+GameState state;
+InputState input1{}, input2{};
+std::mutex inputMutex;
+bool bothConnected = false;
 
 struct clientThread {
     SOCKET ClientSock;
@@ -42,28 +61,23 @@ unsigned __stdcall handler(void *data) {
 
     // receive until player shuts down connection
     do {
-
-        iResult = recv(ClientSock, recvbuf, recvbuflen, 0);
-        if (iResult > 0) {
-            printf("[Client %d] Bytes received: %d\n", clientId, iResult);
-
-            // echo buffer back to sender
-            iSendResult = send(ClientSock, recvbuf, iResult, 0);
-            if (iSendResult == SOCKET_ERROR) {
-                printf("[Client %d] Send failed w/ error: %d\n", WSAGetLastError());
-                return 1;
-            }
-            printf("[Client %d] Bytes sent: %d\n", clientId, iSendResult);
+        //iResult = recv(ClientSock, recvbuf, recvbuflen, 0);
+        InputState input{};
+        int bytesReceived = recv(ClientSock, (char*)&input, sizeof(InputState), 0);
+        if (bytesReceived > 0) {
+           std::lock_guard<std::mutex> lock(inputMutex);
+           if (clientId == 1) input1 = input;
+           else if (clientId == 2) input2 = input;
         }
-        else if (iResult == 0) {
-            printf("[Client %d] Connection closed by client.\n", clientId);
+        else if (bytesReceived == 0) {
+            printf("[Client %d] disconnected.\n", clientId);
         }
         else {
             printf("[Client %d] Recv failed w/ error: %d\n", clientId, WSAGetLastError());
             break;
         }
 
-    } while (iResult > 0);
+    } while (true);
 
     closesocket(ClientSock);
     delete clientData;
@@ -152,20 +166,40 @@ int main() {
 
 //  ----------LISTENING & ACCEPTING-------------------
 //  --------------------------------------------------
-
+    SOCKET ClientSock1 = INVALID_SOCKET;
+    SOCKET ClientSock2 = INVALID_SOCKET;
     int nextId = 1; //client labeling
+
     while (true) {
         sockaddr inaddr {};
         int socklen = sizeof(inaddr);
-
         SOCKET ClientSock = accept(ListenSock, &inaddr, &socklen);
+
         if (ClientSock == INVALID_SOCKET) {
             printf("Accept failed w/error: %d\n", WSAGetLastError());
             continue; //keep listening for next client
-        } else {printf("Client connected at socket: %d\n", (int)ClientSock);}
+        } 
+        
+        printf("Client connected at socket: %d\n", (int)ClientSock);
+
       
+        if (nextId == 1) {
+            ClientSock1 = ClientSock;
+            printf("Assigned to player 1.\n");
+            nextId++;
+            printf("Waiting for player 2...\n");
+        }
+        else if (nextId == 2) {
+            ClientSock2 = ClientSock;
+            printf("Assigned to player 2.\n");
+            printf("Both clients connected! Starting game!\n");
+            break;
+        }
+    }
+
+
         //thread data for newly connected client
-        clientThread *cData = new clientThread;
+        /*clientThread *cData = new clientThread;
         cData->ClientSock = ClientSock;
         cData->clientId = nextId++;
 
@@ -177,11 +211,53 @@ int main() {
             delete cData;
         } else {
             //printf("Spawned handler thread for client %d\n", cData->clientId);
-            CloseHandle((HANDLE)threadHandle);
-        }
+            CloseHandle((HANDLE)threadHandle);*/
 
+    //GAME LOOP!
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
+    while (true) {
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> elapsed = now -lastTime;
+        float dt = elapsed.count();
+        lastTime = now;
+
+        //receive input from players
+        recv(ClientSock1, (char*)&input1, sizeof(InputState), 0);
+        recv(ClientSock2, (char*)&input2, sizeof(InputState), 0);
+    
+        //and convert that input into movement directions
+        float move1 = (input1.up ? -1.0f : 0.0f) + (input1.down ? 1.0f : 0.0f);
+        float move2 = (input2.up ? -1.0f : 0.0f) + (input2.down ? 1.0f : 0.0f);
+   
+        //update objects
+        paddle1.Update(move1, dt);
+        paddle2.Update(move2, dt);
+        ball.Update(dt);
+
+        //collision handling
+        Contact contact1 = Collision(ball, paddle1);
+        if (contact1.type != CollisionType::None) ball.PaddleCollision(contact1);
+
+        Contact contact2 = Collision(ball, paddle2);
+        if (contact2.type != CollisionType::None) ball.PaddleCollision(contact2);
+
+        //build & send game state
+        state.ballPos = ball.position;
+        state.paddle1Pos = paddle1.position;
+        state.paddle2Pos = paddle2.position;
+
+        send(ClientSock1, (char*)&state, sizeof(GameState), 0);
+        send(ClientSock2, (char*)&state, sizeof(GameState), 0);
+
+        //60fps
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+
+
     // close the server socket
+    closesocket(ClientSock1);
+    closesocket(ClientSock2);
     closesocket(ListenSock);
 
     // shutdown connection when done
