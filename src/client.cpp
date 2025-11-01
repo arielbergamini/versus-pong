@@ -8,6 +8,9 @@
 #include <ws2def.h>
 #include <string>
 
+#include "gamestate.h"
+#include "game.h"
+
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
@@ -21,10 +24,7 @@ int main (int argc, char **argv) {
     struct addrinfo *result = NULL,
                     *ptr = NULL,
                     hints;
-    const char *sendbuf = "test test test";
-    char recvbuf[DEFAULT_BUFLEN];
     int iResult;
-    int recvbuflen = DEFAULT_BUFLEN;
 
     // validate parameters
     if (argc != 2) {
@@ -83,17 +83,9 @@ int main (int argc, char **argv) {
         return 1;
     } 
 
+    printf("Connected to server! Waiting for server game state..\n");
 
-    // send initial buffer
-    iResult = send(ConnectSock, sendbuf, (int)strlen(sendbuf), 0);
-    if (iResult == SOCKET_ERROR) {
-        printf("Send failed w/ error: %d\n", WSAGetLastError());
-        closesocket(ConnectSock);
-        WSACleanup();
-        return 1;
-    } else {
-        printf("Bytes sent: %ld\n", iResult);
-    }
+    //loop(ConnectSock);
 
     // shutdown connection
     iResult = shutdown(ConnectSock, SD_SEND);
@@ -103,20 +95,6 @@ int main (int argc, char **argv) {
         WSACleanup();
         return 1;
     }
-
-    // receive until server closes connection
-    do {
-        iResult = recv(ConnectSock, recvbuf, recvbuflen, 0);
-        recvbuf[iResult] = '\0';
-
-        if (iResult > 0) {
-            printf("Message received: %s\n", recvbuf);
-        } else if (iResult == 0) {
-            printf("Connection closed\n");
-        } else {
-            printf("recv failed w/ error: %d\n", WSAGetLastError());
-        }
-    } while (iResult>0);
 
     // cleanup
     closesocket(ConnectSock);

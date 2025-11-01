@@ -1,16 +1,19 @@
 #include "entities.h"
+#include "gamestate.h"
 #include <chrono>
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
 
 //TODO --> read local input and move paddle1
-bool loop () {
+bool loop (SOCKET ServerSock, int playerId) {
     SDL_Event event;
-    SDL_Rect rect;
     bool keep_window_open = true;
-    float dt = 0.016f; //FIXME --> placeholder dt for testing
-    const int BALL_SPEED = 250;
+    float dt = 0.016f; 
 
     //----------Create game objects once
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
@@ -27,20 +30,16 @@ bool loop () {
     Paddle paddle2(
         Vec2d(680.0 - 50.0f, 480.0 / 2.0f),
         Vec2d(0.0f, 0.0f));   
+    
+    InputState input{};
+    input.up = false;
+    input.down = false;
+    GameState state{};
 
     //GAME LOOP-------------------------------------------
     auto lastTime = std::chrono::high_resolution_clock::now();
 
     while (keep_window_open) {
-        //frame dt
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> elapsed = currentTime - lastTime;
-        dt = elapsed.count();
-        lastTime = currentTime;
-
-        if (dt > 0.05f) dt = 0.05f; //damping
-
         //handling window events
         while (SDL_PollEvent(&event)) { 
                 if (event.type == SDL_QUIT) { //close window if user wants to quit
@@ -48,50 +47,38 @@ bool loop () {
                 }
             }
 
-            //handle LOCAL CLIENT (paddle1)
-            //
-            //
+            //handle LOCAL input
             const Uint8* keys = SDL_GetKeyboardState(nullptr);
-            float moveDir = 0.0f;
-            //player 1
-            if (keys[SDL_SCANCODE_W]) moveDir -= 1.0f;
-            if (keys[SDL_SCANCODE_S]) moveDir += 1.0f;
+            input.up = keys[SDL_SCANCODE_W];
+            input.down = keys[SDL_SCANCODE_W];
 
+            //send to server
+            send(ServerSock, (char*)&input, sizeof(InputState), 0);
+
+            int bytes = recv(ServerSock, (char*)&input, sizeof(InputState), 0);
+            if (bytes <= 0) {
+                printf("Server disconnected\n");
+                break;
+            }
             //update object positions
-            paddle1.Update(moveDir, dt);
-            ball.Update(dt);
+            ball.position = state.ballPos;
+            paddle1.position = state.paddle1Pos;
+            paddle2.position = state.paddle2Pos;
 
-            //check collisions
-            Contact contact1 = Collision(ball, paddle1);
-            if (contact1.type != CollisionType::None) {
-                ball.PaddleCollision(contact1);
-            }
-
-            Contact contact2 = Collision(ball, paddle2);
-            if (contact2.type != CollisionType::None) {
-                ball.PaddleCollision(contact2);
-            }
-            //===TODO --> SEND local input to server
-            //
-            //
-            //auto stopTime = std::chrono::high_resolution_clock::now();
-            //dt = std::chrono::duration<float, std::chrono::milliseconds::period>(stopTime - startTime).count();
-
+          
             //------Rendering-------
-            //clear bg to black
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
-
             //paddle colors set to pink
             SDL_SetRenderDrawColor(renderer, 233, 4, 122, 0.8);
             
             //draw objects to window
             paddle1.Draw(renderer);
             paddle2.Draw(renderer);
-
             ball.Draw(renderer);
 
             SDL_RenderPresent(renderer);
+            SDL_Delay(16); //60fps
         }
 
     SDL_DestroyWindow(window);

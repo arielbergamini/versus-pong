@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <iostream>
 
-bool init();
+bool init(SOCKET sock);
 void kill();
 bool loop();
 
