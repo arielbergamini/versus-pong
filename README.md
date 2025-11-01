@@ -1,6 +1,6 @@
-## Versus Pong! -- Networked Pong using Winsock
+## Versus Pong! -- Networked Pong using Winsock & SDL2 -- Currently in Progress
 
-Versus Pong utilizes a basic client-server setup for a networked two-player Pong game using Winsock on Windows. The server listens for incoming TCP connections, and the client connects and exchanges data, which is then echoed back to the client (currently a simple test message).
+Versus Pong utilizes a client-server setup for a networked two-player Pong game using Winsock on Windows. The server listens for two clients and connects them to a game loop supporting state sharing and quick feedback. 
 
 ## Requirements
 
